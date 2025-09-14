@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-// Self-Kindness Wallpaper Maker (Mobile Optimized)
+// Self-Kindness Wallpaper Maker (Mobile Optimized, flicker-free)
 const BASE_LINE_HEIGHT = 1.8; // 줄간격 고정
 const PADDING_RATIO = 0.06;   // 가로폭의 6% 패딩
 
@@ -99,10 +99,8 @@ function enhanceGradient(hex1, hex2) {
   const { r:r2,g:g2,b:b2 } = hexToRgb(hex2);
   const c1 = rgbToHsl(r1,g1,b1);
   const c2 = rgbToHsl(r2,g2,b2);
-  // 시작은 약간 어둡게(+채도), 끝은 약간 밝게(+채도)
   const s1 = hslToHex(c1.h, clamp(c1.s + 6, 0, 100), clamp(c1.l - 6, 0, 100));
   const s2 = hslToHex(c2.h, clamp(c2.s + 6, 0, 100), clamp(c2.l + 6, 0, 100));
-  // 중간은 두 색의 중간 H, L에 채도 +10
   const midH = (c1.h + c2.h) / 2;
   const midL = clamp((c1.l + c2.l) / 2, 0, 100);
   const midS = clamp(((c1.s + c2.s)/2) + 10, 0, 100);
@@ -150,7 +148,7 @@ export default function App() {
   const [bgMode, setBgMode] = useState("gradient"); // 'gradient' | 'solid' | 'image'
   const [paletteIdx, setPaletteIdx] = useState(0);
   const [solidColor, setSolidColor] = useState("#111827");
-  const [overlay, setOverlay] = useState(0.08);     // ↓ 기본 어둡게 정도를 줄여 그라디언트가 더 보이게
+  const [overlay, setOverlay] = useState(0.08);
   const [fontIdx, setFontIdx] = useState(0);
   const [fontSize, setFontSize] = useState(84);
   const [textColor, setTextColor] = useState("#0B1220");
@@ -169,7 +167,7 @@ export default function App() {
   }, []);
 
   const canvasRef = useRef(null);
-  const PREVIEW_SCALE = 0.35;
+  const previewFrameRef = useRef(null);
 
   const size = useMemo(() => {
     const preset = PRESET_SIZES[sizeIdx];
@@ -182,13 +180,29 @@ export default function App() {
 
   const bgImg = useImage(bgFileUrl);
 
-  // preview draw
-  useEffect(() => { draw(false); }, [message, size, bgMode, paletteIdx, solidColor, overlay, fontIdx, fontSize, textColor, bgImg, grain]);
+  // 프레임 실측 크기 변화를 감지해서만 리드로우 (주소창 토글로 인한 깜빡임 방지)
   useEffect(() => {
-    const onResize = () => draw(false);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    if (!previewFrameRef.current) return;
+    let lastWidth = 0;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const cr = entry.contentRect;
+      const w = Math.round(cr.width);
+      if (w !== lastWidth) {
+        lastWidth = w;
+        draw(false);
+      }
+    });
+    ro.observe(previewFrameRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 주요 상태 변화 시 그리기
+  useEffect(() => {
+    draw(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message, size, bgMode, paletteIdx, solidColor, overlay, fontIdx, fontSize, textColor, bgImg, grain]);
 
   // actions
   function handlePickPrompt() {
@@ -220,16 +234,31 @@ export default function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const targetW = isExport ? size.w : Math.max(360, Math.round(size.w * PREVIEW_SCALE));
-    const targetH = isExport ? size.h : Math.max(720, Math.round(size.h * PREVIEW_SCALE));
-    canvas.width = targetW;
-    canvas.height = targetH;
+    const frame = previewFrameRef.current;
+    const dpr = window.devicePixelRatio || 1;
+
+    // 프리뷰: 프레임 실측 크기 사용 (모바일 주소창 변화에도 안정)
+    const targetW = isExport
+      ? size.w
+      : Math.max(320, Math.round(frame?.clientWidth || 360));
+    // 미리보기 frame은 aspect-[9/19.5]라 가드만 추가
+    const targetH = isExport
+      ? size.h
+      : Math.max(Math.round(targetW * (19.5 / 9)), Math.round(frame?.clientHeight || 720));
+
+    // CSS 크기와 내부 픽셀 크기 분리 + DPR 스케일
+    canvas.style.width = `${targetW}px`;
+    canvas.style.height = `${targetH}px`;
+    canvas.width = Math.round(targetW * dpr);
+    canvas.height = Math.round(targetH * dpr);
+
     const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     if (bgMode === "gradient") {
       const [c1, c2] = PALETTES[paletteIdx];
-      const [g0, gMid, g1] = enhanceGradient(c1, c2); // ← 대비 강화된 3스톱
+      const [g0, gMid, g1] = enhanceGradient(c1, c2);
       const grad = ctx.createLinearGradient(0, 0, targetW, targetH);
       grad.addColorStop(0, g0);
       grad.addColorStop(0.5, gMid);
@@ -252,7 +281,7 @@ export default function App() {
       ctx.fillRect(0, 0, targetW, targetH);
     }
 
-    // Overlay (더 낮춘 기본값이라 그라디언트가 살아남)
+    // Overlay
     if (overlay > 0) {
       ctx.fillStyle = `rgba(0,0,0,${overlay})`;
       ctx.fillRect(0, 0, targetW, targetH);
@@ -272,8 +301,8 @@ export default function App() {
     }
 
     // Text (정렬은 항상 중앙)
-    const scale = targetW / size.w;
-    const fSize = Math.max(10, Math.round(fontSize * (isExport ? 1 : scale)));
+    const scale = isExport ? 1 : (targetW / size.w);
+    const fSize = Math.max(10, Math.round(fontSize * scale));
     const fPad  = Math.max(16, Math.round(targetW * PADDING_RATIO));
     const fLH   = Math.round(fSize * BASE_LINE_HEIGHT);
 
@@ -288,7 +317,6 @@ export default function App() {
     const { lines, height } = wrapText(ctx, message, maxWidth, fLH);
     let y = (targetH - height) / 2 + fLH / 2; // 세로 중앙 고정
 
-    // No shadow
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
 
@@ -309,9 +337,8 @@ export default function App() {
     requestAnimationFrame(() => draw(false));
   }
 
-  // --- UI ---
   return (
-    <div className="min-h-screen w-full bg-stone-50 text-stone-900 pb-10">
+    <div className="min-h-screen w-full bg-stone-50 text-stone-900 pb-10" style={{ overscrollBehavior: "contain" }}>
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
         <header className="mb-4 sm:mb-6 flex items-start sm:items-center justify-between gap-3">
           <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight">Self-Kindness Wallpaper Maker</h1>
@@ -335,7 +362,7 @@ export default function App() {
                 className="w-full resize-y rounded-xl border border-stone-200 p-2 sm:p-3
                 focus:outline-none focus:ring-2 focus:ring-stone-400 text-sm sm:text-base
                 placeholder:text-stone-400 placeholder:italic"
-                />
+              />
             </div>
 
             {/* Mobile: preview under message + buttons */}
@@ -343,8 +370,12 @@ export default function App() {
               <div className="mt-3">
                 <div className="bg-white rounded-3xl shadow p-3 flex flex-col items-center">
                   <div className="w-full text-sm text-stone-500 mb-2">미리보기</div>
-                  <div className="relative w-full max-w-[430px] aspect-[9/19.5] rounded-[2rem] border-8 border-stone-900 overflow-hidden shadow-2xl">
-                    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" />
+                  <div
+                    ref={previewFrameRef}
+                    className="relative w-full max-w-[430px] aspect-[9/19.5] rounded-[2rem] border-8 border-stone-900 overflow-hidden shadow-2xl"
+                    style={{ WebkitTransform: "translateZ(0)", willChange: "transform" }}
+                  >
+                    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
                     <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-2 bg-stone-900/90 rounded-full" />
                   </div>
                 </div>
@@ -467,8 +498,12 @@ export default function App() {
           {isDesktop && (
             <div className="bg-white rounded-3xl shadow p-3 sm:p-5 flex flex-col items-center lg:sticky lg:top-2 h-fit">
               <div className="w-full text-sm text-stone-500 mb-2">미리보기</div>
-              <div className="relative w-full max-w-[430px] aspect-[9/19.5] rounded-[2rem] sm:rounded-[3rem] border-8 border-stone-900 overflow-hidden shadow-2xl">
-                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" />
+              <div
+                ref={previewFrameRef}
+                className="relative w-full max-w-[430px] aspect-[9/19.5] rounded-[2rem] sm:rounded-[3rem] border-8 border-stone-900 overflow-hidden shadow-2xl"
+                style={{ WebkitTransform: "translateZ(0)", willChange: "transform" }}
+              >
+                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-2 bg-stone-900/90 rounded-full"/>
               </div>
               <div className="mt-3 sm:mt-4 text-xs text-stone-500 text-center leading-relaxed">
