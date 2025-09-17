@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/Self-Kindness-Wallpaper-Maker/static/css/main.e1c89642.css",
-    "main.js": "/Self-Kindness-Wallpaper-Maker/static/js/main.4574aaa7.js",
+    "main.css": "/Self-Kindness-Wallpaper-Maker/static/css/main.a5a3b6ae.css",
+    "main.js": "/Self-Kindness-Wallpaper-Maker/static/js/main.c3bfff90.js",
     "index.html": "/Self-Kindness-Wallpaper-Maker/index.html",
-    "main.e1c89642.css.map": "/Self-Kindness-Wallpaper-Maker/static/css/main.e1c89642.css.map",
-    "main.4574aaa7.js.map": "/Self-Kindness-Wallpaper-Maker/static/js/main.4574aaa7.js.map"
+    "main.a5a3b6ae.css.map": "/Self-Kindness-Wallpaper-Maker/static/css/main.a5a3b6ae.css.map",
+    "main.c3bfff90.js.map": "/Self-Kindness-Wallpaper-Maker/static/js/main.c3bfff90.js.map"
   },
   "entrypoints": [
-    "static/css/main.e1c89642.css",
-    "static/js/main.4574aaa7.js"
+    "static/css/main.a5a3b6ae.css",
+    "static/js/main.c3bfff90.js"
   ]
 }
