@@ -90,16 +90,16 @@ export default function WallpaperMaker({
   const imgs = usePreloadedImages(backgroundImages);
 
   // 데스크톱 여부(레이아웃 클래스만 제어; 렌더 조건 분기로 캔버스 교체하지 않음)
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window !== "undefined" &&
-    window.matchMedia("(min-width: 1024px)").matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const onChange = (e) => setIsDesktop(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
+  // const [isDesktop, setIsDesktop] = useState(() =>
+  //   typeof window !== "undefined" &&
+  //   window.matchMedia("(min-width: 1024px)").matches
+  // );
+  // useEffect(() => {
+  //   const mq = window.matchMedia("(min-width: 1024px)");
+  //   const onChange = (e) => setIsDesktop(e.matches);
+  //   mq.addEventListener("change", onChange);
+  //   return () => mq.removeEventListener("change", onChange);
+  // }, []);
 
   const canvasRef = useRef(null);
   const previewFrameRef = useRef(null);
